@@ -27,6 +27,14 @@ def init_db():
 
 
 # -------------------------------
+# ✅ 0. HOME ROUTE (FIX)
+# -------------------------------
+@app.route("/")
+def home():
+    return redirect(url_for("clinic_page", clinic_id=1))
+
+
+# -------------------------------
 # 1. Clinic Page
 # -------------------------------
 @app.route("/clinic/<int:clinic_id>")
@@ -70,7 +78,7 @@ def join_queue():
 
 
 # -------------------------------
-# 3. Queue Status Page (FIXED)
+# 3. Queue Status Page
 # -------------------------------
 @app.route("/queue/<int:entry_id>")
 def queue_status(entry_id):
