@@ -8,14 +8,27 @@ class Config:
     if db_url and db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-    # Optional fallback (only for local testing)
     if not db_url:
-        db_url = "sqlite:///local.db"
+        db_url = "sqlite:///local.db"  # local only
 
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
     SQLALCHEMY_DATABASE_URI = db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # -----------------------------
+    # SECURITY (FIXED)
+    # -----------------------------
+    SECRET_KEY = os.getenv("SECRET_KEY")
+
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY is not set in environment variables")
+
+    # -----------------------------
+    # SESSION CONFIG
+    # -----------------------------
     SESSION_COOKIE_HTTPONLY = True
     REMEMBER_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
-    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+
+    SESSION_COOKIE_SECURE = (
+        os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    )
