@@ -11,7 +11,7 @@ db.init_app(app)
 
 
 # -------------------------------
-# 🔥 CLI COMMAND (DB INIT)
+# 🔥 CLI COMMAND (SAFE DB INIT)
 # -------------------------------
 @app.cli.command("init-db")
 def init_db():
@@ -24,21 +24,6 @@ def init_db():
         db.session.commit()
 
     print("Database initialized.")
-
-
-# -------------------------------
-# ✅ TEMP ROUTE (USE ONCE)
-# -------------------------------
-@app.route("/init-db")
-def init_db_route():
-    db.create_all()
-
-    if not Clinic.query.first():
-        clinic = Clinic(clinic_name="City Clinic", doctor_name="Dr. Sharma")
-        db.session.add(clinic)
-        db.session.commit()
-
-    return "Database initialized!"
 
 
 # -------------------------------
