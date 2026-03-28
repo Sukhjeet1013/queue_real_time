@@ -1,86 +1,94 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{ clinic.clinic_name }}</title>
+{% extends "base.html" %}
 
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+{% block title %}{{ clinic.clinic_name }} | SmartQueue{% endblock %}
 
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-</head>
+{% block content %}
+<section class="container py-5">
+    <div class="row g-4 align-items-stretch">
+        <div class="col-lg-5">
+            <div class="hero-panel h-100">
+                <span class="eyebrow">Join Queue</span>
+                <h1 class="page-title text-white mb-2">{{ clinic.clinic_name }}</h1>
+                <p class="hero-copy text-white-50 mb-4">Doctor on duty: {{ clinic.doctor_name }}</p>
 
-<body class="bg-light">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="glass-card h-100">
+                            <p class="metric-label text-white-50">Now serving</p>
+                            <h2 class="metric-value text-white">
+                                {% if active_entry %}
+                                    {{ active_entry.token_number }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </h2>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="glass-card h-100">
+                            <p class="metric-label text-white-50">Waiting patients</p>
+                            <h2 class="metric-value text-white">{{ waiting_count }}</h2>
+                        </div>
+                    </div>
+                </div>
 
-<div class="container mt-5">
-
-    <!-- Header -->
-    <div class="text-center mb-4">
-        <h1 class="fw-bold">{{ clinic.clinic_name }}</h1>
-        <p class="text-muted">Doctor: {{ clinic.doctor_name }}</p>
-    </div>
-
-    <!-- Card -->
-    <div class="card shadow p-4 mx-auto" style="max-width: 500px; border-radius: 15px;">
-
-        <form method="POST" action="{{ url_for('join_queue') }}" id="queue-form">
-
-            <input type="hidden" name="clinic_id" value="{{ clinic.id }}">
-
-            <!-- Name -->
-            <div class="mb-3">
-                <label class="form-label">Your Name</label>
-                <input 
-                    type="text" 
-                    name="name" 
-                    class="form-control"
-                    placeholder="Enter your name"
-                    required
-                >
+                <p class="hero-note mb-0 mt-4">
+                    Fill in your details once and you will be redirected to your live queue status page.
+                </p>
             </div>
+        </div>
 
-            <!-- Phone -->
-            <div class="mb-3">
-                <label class="form-label">Phone Number</label>
-                <input 
-                    type="tel" 
-                    name="phone" 
-                    class="form-control"
-                    placeholder="Enter phone number"
-                    pattern="[0-9]{10}"
-                    required
-                >
-                <small class="text-muted">Enter 10-digit number</small>
+        <div class="col-lg-7">
+            <div class="soft-card form-shell h-100">
+                <div class="mb-4">
+                    <span class="eyebrow">Patient Registration</span>
+                    <h2 class="h3 mb-2">Get your token</h2>
+                    <p class="section-muted mb-0">
+                        Enter your details below. We only use your number to help the clinic identify your registration.
+                    </p>
+                </div>
+
+                <form method="POST" action="{{ url_for('join_queue') }}" data-loading-form>
+                    <input type="hidden" name="clinic_id" value="{{ clinic.id }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">Full name</label>
+                        <input
+                            type="text"
+                            name="name"
+                            class="form-control form-control-lg"
+                            placeholder="Enter your full name"
+                            required
+                        >
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Phone number</label>
+                        <input
+                            type="tel"
+                            name="phone"
+                            class="form-control form-control-lg"
+                            placeholder="Enter your 10-digit phone number"
+                            inputmode="numeric"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit" class="btn btn-brand btn-lg w-100" data-loading-text="Joining queue...">
+                        Join Queue
+                    </button>
+                </form>
+
+                <div class="note-panel mt-4">
+                    <h3 class="h6 mb-2">What happens next?</h3>
+                    <ul class="info-list mb-0">
+                        <li>You receive a token number instantly.</li>
+                        <li>You can track the live queue from your phone.</li>
+                        <li>The clinic dashboard controls calling and serving patients.</li>
+                    </ul>
+                </div>
             </div>
-
-            <!-- Submit -->
-            <button class="btn btn-primary w-100" id="submit-btn">
-                Join Queue
-            </button>
-
-        </form>
-
-        <!-- Feedback message -->
-        <p id="status-msg" class="text-center mt-3 text-muted" style="display: none;">
-            Joining queue...
-        </p>
-
+        </div>
     </div>
-
-</div>
-
-<!-- JS (UX improvement) -->
-<script>
-const form = document.getElementById("queue-form");
-const btn = document.getElementById("submit-btn");
-const msg = document.getElementById("status-msg");
-
-form.addEventListener("submit", function() {
-    btn.disabled = true;
-    btn.innerText = "Joining...";
-    msg.style.display = "block";
-});
-</script>
-
-</body>
-</html>
+</section>
+{% endblock %}

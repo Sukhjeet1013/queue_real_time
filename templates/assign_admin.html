@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}Assign Admin | SmartQueue{% endblock %}
+
+{% block content %}
+<section class="container py-5">
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="soft-card form-shell h-100">
+                <div class="mb-4">
+                    <span class="eyebrow">Superadmin Action</span>
+                    <h1 class="page-title mb-2">Assign a clinic admin</h1>
+                    <p class="section-muted mb-0">
+                        Create a secure staff login and bind it to the clinic they should manage.
+                    </p>
+                </div>
+
+                {% if clinics %}
+                    <form method="POST" data-loading-form>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input
+                                type="text"
+                                name="username"
+                                class="form-control form-control-lg"
+                                placeholder="Choose a username"
+                                required
+                            >
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input
+                                type="password"
+                                name="password"
+                                class="form-control form-control-lg"
+                                placeholder="Create a secure password"
+                                minlength="8"
+                                required
+                            >
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Assign clinic</label>
+                            <select name="clinic_id" class="form-select form-select-lg" required>
+                                <option value="">Select a clinic</option>
+                                {% for clinic in clinics %}
+                                    <option value="{{ clinic.id }}">{{ clinic.clinic_name }} | {{ clinic.doctor_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-brand btn-lg" data-loading-text="Creating admin...">
+                            Create Clinic Admin
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="empty-state">
+                        <h2 class="h5 mb-2">No clinics available</h2>
+                        <p class="section-muted mb-3">
+                            Add a clinic before assigning a clinic admin account.
+                        </p>
+                        <a href="{{ url_for('add_clinic') }}" class="btn btn-brand">Add Clinic</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="soft-card table-shell h-100">
+                <div class="mb-3">
+                    <h2 class="h4 mb-1">Current clinic admins</h2>
+                    <p class="section-muted mb-0">All staff accounts that can manage clinic queues.</p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table app-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Clinic</th>
+                                <th>Role</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for admin_user in admin_users %}
+                                <tr>
+                                    <td class="fw-semibold">{{ admin_user.username }}</td>
+                                    <td>{{ admin_user.clinic.clinic_name if admin_user.clinic else "Not assigned" }}</td>
+                                    <td>{{ admin_user.role.replace('_', ' ')|title }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="section-muted">No clinic admins have been created yet.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
