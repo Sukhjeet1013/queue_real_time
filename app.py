@@ -11,7 +11,7 @@ db.init_app(app)
 
 
 # -------------------------------
-# 🔥 CLI COMMAND (SAFE DB INIT)
+# 🔥 CLI COMMAND (DB INIT)
 # -------------------------------
 @app.cli.command("init-db")
 def init_db():
@@ -19,19 +19,32 @@ def init_db():
     db.create_all()
 
     if not Clinic.query.first():
-        clinic = Clinic(clinic_name="City Clinic", doctor_name="Dr. Sharma")
-        db.session.add(clinic)
+        clinics = [
+            Clinic(clinic_name="City Clinic", doctor_name="Dr. Sharma"),
+            Clinic(clinic_name="HealthCare Plus", doctor_name="Dr. Mehta"),
+            Clinic(clinic_name="Wellness Center", doctor_name="Dr. Rao"),
+        ]
+        db.session.add_all(clinics)
         db.session.commit()
 
     print("Database initialized.")
 
 
 # -------------------------------
-# ✅ HOME ROUTE
+# ✅ HOME ROUTE → CLINICS PAGE
 # -------------------------------
 @app.route("/")
 def home():
-    return redirect(url_for("clinic_page", clinic_id=1))
+    return redirect(url_for("clinics_list"))
+
+
+# -------------------------------
+# 🔥 NEW: CLINICS LIST
+# -------------------------------
+@app.route("/clinics")
+def clinics_list():
+    clinics = Clinic.query.all()
+    return render_template("clinics.html", clinics=clinics)
 
 
 # -------------------------------

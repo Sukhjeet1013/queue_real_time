@@ -21,9 +21,9 @@
     </div>
 
     <!-- Card -->
-    <div class="card shadow p-4 mx-auto" style="max-width: 500px;">
+    <div class="card shadow p-4 mx-auto" style="max-width: 500px; border-radius: 15px;">
 
-        <form method="POST" action="/join_queue" id="queue-form">
+        <form method="POST" action="{{ url_for('join_queue') }}" id="queue-form">
 
             <input type="hidden" name="clinic_id" value="{{ clinic.id }}">
 
@@ -43,12 +43,14 @@
             <div class="mb-3">
                 <label class="form-label">Phone Number</label>
                 <input 
-                    type="text" 
+                    type="tel" 
                     name="phone" 
                     class="form-control"
                     placeholder="Enter phone number"
+                    pattern="[0-9]{10}"
                     required
                 >
+                <small class="text-muted">Enter 10-digit number</small>
             </div>
 
             <!-- Submit -->
@@ -67,7 +69,7 @@
 
 </div>
 
-<!-- JS (small but important UX improvement) -->
+<!-- JS (UX improvement) -->
 <script>
 const form = document.getElementById("queue-form");
 const btn = document.getElementById("submit-btn");
