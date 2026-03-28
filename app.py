@@ -1,7 +1,48 @@
-# (ONLY showing modified parts clearly — rest stays same structure)
+import os
+from datetime import datetime
+
+from flask import Flask, render_template, redirect, url_for, flash, abort
+from flask_login import LoginManager, login_required, current_user
+from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
+
+from config import Config
+from models import db, Clinic, User, Patient, QueueEntry
+
 
 # -----------------------------
-# FIX 1: WAIT TIME LOGIC
+# APP SETUP
+# -----------------------------
+app = Flask(__name__)
+app.config.from_object(Config)
+
+db.init_app(app)
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+
+
+# -----------------------------
+# AUTH HELPERS (ASSUMING YOU ALREADY HAVE THIS)
+# -----------------------------
+def clinic_admin_required(func):
+    from functools import wraps
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return login_manager.unauthorized()
+
+        if current_user.role != User.ROLE_CLINIC_ADMIN:
+            abort(403)
+
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+# -----------------------------
+# WAIT TIME LOGIC (FIXED)
 # -----------------------------
 def compute_estimated_wait_minutes(entry):
     if entry.status != QueueEntry.STATUS_WAITING:
@@ -26,12 +67,9 @@ def compute_estimated_wait_minutes(entry):
     durations = []
     for served_entry in recent_served_entries:
         duration = served_entry.served_at - served_entry.consultation_started_at
-
-        # ✅ FIXED: never allow 0 duration
         duration_minutes = max(1, int(duration.total_seconds() // 60))
         durations.append(duration_minutes)
 
-    # ✅ FIXED: fallback if no history
     patients_ahead = db.session.scalar(
         select(func.count(QueueEntry.id)).where(
             QueueEntry.clinic_id == entry.clinic_id,
@@ -50,14 +88,14 @@ def compute_estimated_wait_minutes(entry):
     slots_ahead = patients_ahead + (1 if has_active else 0)
 
     if not durations:
-        return 5 * slots_ahead  # ✅ fallback logic
+        return 5 * slots_ahead
 
     avg = round(sum(durations) / len(durations))
     return avg * slots_ahead
 
 
 # -----------------------------
-# FIX 2: CALL NEXT (REMOVE LOCKS)
+# CALL NEXT
 # -----------------------------
 @app.route("/call_next/<int:clinic_id>", methods=["POST"])
 @clinic_admin_required
@@ -106,7 +144,7 @@ def call_next(clinic_id):
 
 
 # -----------------------------
-# FIX 3: MARK SERVED (REMOVE LOCK)
+# MARK SERVED (FIXED)
 # -----------------------------
 @app.route("/mark_served/<int:entry_id>", methods=["POST"])
 @app.route("/complete/<int:entry_id>", methods=["POST"])
@@ -142,19 +180,16 @@ def mark_served(entry_id):
 
 
 # -----------------------------
-# FIX 4: REMOVE DUPLICATE BOOTSTRAP
+# BOOTSTRAP (ONLY ON DEPLOY)
 # -----------------------------
+def bootstrap_database():
+    db.create_all()
 
-# ❌ REMOVE THIS BLOCK COMPLETELY:
-# with app.app_context():
-#     bootstrap_database()
 
-# -----------------------------
-# KEEP ONLY THIS:
-# -----------------------------
 if __name__ != "__main__":
     with app.app_context():
         bootstrap_database()
+
 
 if __name__ == "__main__":
     app.run(debug=True)
