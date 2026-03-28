@@ -31,6 +31,21 @@ def init_db():
 
 
 # -------------------------------
+# 🚀 ROUTE-BASED DB INIT (NEW)
+# -------------------------------
+@app.route("/init-db")
+def init_db_route():
+    db.create_all()
+
+    if not Clinic.query.first():
+        clinic = Clinic(clinic_name="City Clinic", doctor_name="Dr. Sharma")
+        db.session.add(clinic)
+        db.session.commit()
+
+    return "Database initialized!"
+
+
+# -------------------------------
 # ✅ HOME → CLINICS LIST
 # -------------------------------
 @app.route("/")
@@ -78,7 +93,7 @@ def clinic_page(clinic_id):
 
 
 # -------------------------------
-# 2. JOIN QUEUE (FIXED)
+# 2. JOIN QUEUE (SAFE)
 # -------------------------------
 @app.route("/join_queue", methods=["POST"])
 def join_queue():
@@ -109,7 +124,6 @@ def join_queue():
 
             db.session.add(entry)
             db.session.commit()
-
             break
 
         except IntegrityError:
@@ -191,111 +205,6 @@ def queue_status(entry_id):
         patients_ahead=patients_ahead,
         estimated_wait=estimated_wait
     )
-
-
-# -------------------------------
-# 4. API (REAL-TIME)
-# -------------------------------
-@app.route("/api/queue_status/<int:entry_id>")
-def queue_status_api(entry_id):
-    entry = QueueEntry.query.get_or_404(entry_id)
-
-    current = (
-        QueueEntry.query
-        .filter_by(clinic_id=entry.clinic_id, status="in_consultation")
-        .first()
-    )
-
-    if current:
-        now_serving_token = current.token_number
-    else:
-        next_waiting = (
-            QueueEntry.query
-            .filter_by(clinic_id=entry.clinic_id, status="waiting")
-            .order_by(QueueEntry.token_number)
-            .first()
-        )
-        now_serving_token = next_waiting.token_number if next_waiting else None
-
-    patients_ahead = (
-        QueueEntry.query
-        .filter(
-            QueueEntry.clinic_id == entry.clinic_id,
-            QueueEntry.status.in_(["waiting", "in_consultation"]),
-            QueueEntry.token_number < entry.token_number
-        )
-        .count()
-    )
-
-    return jsonify({
-        "token": entry.token_number,
-        "now_serving": now_serving_token,
-        "patients_ahead": patients_ahead,
-        "estimated_wait": None
-    })
-
-
-# -------------------------------
-# 5. ADMIN DASHBOARD
-# -------------------------------
-@app.route("/admin/<int:clinic_id>")
-def admin_dashboard(clinic_id):
-    entries = (
-        QueueEntry.query
-        .filter_by(clinic_id=clinic_id)
-        .order_by(QueueEntry.token_number)
-        .all()
-    )
-
-    return render_template(
-        "admin.html",
-        entries=entries,
-        clinic_id=clinic_id
-    )
-
-
-# -------------------------------
-# 6. CALL NEXT
-# -------------------------------
-@app.route("/call_next/<int:clinic_id>", methods=["POST"])
-def call_next(clinic_id):
-
-    current = (
-        QueueEntry.query
-        .filter_by(clinic_id=clinic_id, status="in_consultation")
-        .first()
-    )
-
-    if current:
-        return redirect(url_for("admin_dashboard", clinic_id=clinic_id))
-
-    next_patient = (
-        QueueEntry.query
-        .filter_by(clinic_id=clinic_id, status="waiting")
-        .order_by(QueueEntry.token_number)
-        .first()
-    )
-
-    if next_patient:
-        next_patient.status = "in_consultation"
-        db.session.commit()
-
-    return redirect(url_for("admin_dashboard", clinic_id=clinic_id))
-
-
-# -------------------------------
-# 7. COMPLETE CONSULTATION
-# -------------------------------
-@app.route("/complete/<int:entry_id>", methods=["POST"])
-def complete_consultation(entry_id):
-    entry = QueueEntry.query.get_or_404(entry_id)
-
-    if entry.status == "in_consultation":
-        entry.status = "served"
-        entry.served_at = datetime.utcnow()
-        db.session.commit()
-
-    return redirect(url_for("admin_dashboard", clinic_id=entry.clinic_id))
 
 
 # -------------------------------
