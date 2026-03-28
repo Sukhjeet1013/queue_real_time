@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Clinic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container mt-5">
+
+    <h2 class="text-center mb-4">Select a Clinic</h2>
+
+    <div class="row">
+
+        {% for clinic in clinics %}
+        <div class="col-md-4 mb-4">
+            <div class="card shadow p-3 text-center">
+
+                <h4>{{ clinic.clinic_name }}</h4>
+                <p class="text-muted">{{ clinic.doctor_name }}</p>
+
+                <a href="{{ url_for('clinic_page', clinic_id=clinic.id) }}" class="btn btn-primary">
+                    Join Queue
+                </a>
+
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+</body>
+</html>
