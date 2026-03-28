@@ -23,6 +23,20 @@ login_manager.login_view = "login"
 
 
 # -----------------------------
+# NEW ROUTES (ADDED)
+# -----------------------------
+@app.route("/")
+def home():
+    return redirect(url_for("clinics_list"))
+
+
+@app.route("/clinics")
+def clinics_list():
+    clinics = Clinic.query.all()
+    return render_template("clinics.html", clinics=clinics)
+
+
+# -----------------------------
 # AUTH HELPERS (ASSUMING YOU ALREADY HAVE THIS)
 # -----------------------------
 def clinic_admin_required(func):
