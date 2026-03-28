@@ -15,7 +15,6 @@ db.init_app(app)
 # -------------------------------
 @app.cli.command("init-db")
 def init_db():
-    """Initialize the database."""
     db.create_all()
 
     if not Clinic.query.first():
@@ -31,7 +30,7 @@ def init_db():
 
 
 # -------------------------------
-# ✅ HOME ROUTE → CLINICS PAGE
+# ✅ HOME → CLINICS LIST
 # -------------------------------
 @app.route("/")
 def home():
@@ -39,7 +38,7 @@ def home():
 
 
 # -------------------------------
-# 🔥 NEW: CLINICS LIST
+# 🔥 CLINICS LIST
 # -------------------------------
 @app.route("/clinics")
 def clinics_list():
@@ -48,7 +47,28 @@ def clinics_list():
 
 
 # -------------------------------
-# 1. Clinic Page
+# 🔥 ADD CLINIC (NEW)
+# -------------------------------
+@app.route("/add_clinic", methods=["GET", "POST"])
+def add_clinic():
+    if request.method == "POST":
+        name = request.form.get("clinic_name")
+        doctor = request.form.get("doctor_name")
+
+        if not name or not doctor:
+            return "Invalid input", 400
+
+        clinic = Clinic(clinic_name=name, doctor_name=doctor)
+        db.session.add(clinic)
+        db.session.commit()
+
+        return redirect(url_for("clinics_list"))
+
+    return render_template("add_clinic.html")
+
+
+# -------------------------------
+# 1. CLINIC PAGE
 # -------------------------------
 @app.route("/clinic/<int:clinic_id>")
 def clinic_page(clinic_id):
@@ -57,7 +77,7 @@ def clinic_page(clinic_id):
 
 
 # -------------------------------
-# 2. Join Queue
+# 2. JOIN QUEUE
 # -------------------------------
 @app.route("/join_queue", methods=["POST"])
 def join_queue():
@@ -91,7 +111,7 @@ def join_queue():
 
 
 # -------------------------------
-# 3. Queue Status Page
+# 3. QUEUE STATUS
 # -------------------------------
 @app.route("/queue/<int:entry_id>")
 def queue_status(entry_id):
@@ -172,7 +192,7 @@ def queue_status(entry_id):
 
 
 # -------------------------------
-# 4. API Endpoint
+# 4. API (REAL-TIME)
 # -------------------------------
 @app.route("/api/queue_status/<int:entry_id>")
 def queue_status_api(entry_id):
@@ -214,7 +234,7 @@ def queue_status_api(entry_id):
 
 
 # -------------------------------
-# 5. Admin Dashboard
+# 5. ADMIN DASHBOARD
 # -------------------------------
 @app.route("/admin/<int:clinic_id>")
 def admin_dashboard(clinic_id):
@@ -233,7 +253,7 @@ def admin_dashboard(clinic_id):
 
 
 # -------------------------------
-# 6. Call Next
+# 6. CALL NEXT
 # -------------------------------
 @app.route("/call_next/<int:clinic_id>", methods=["POST"])
 def call_next(clinic_id):
@@ -262,7 +282,7 @@ def call_next(clinic_id):
 
 
 # -------------------------------
-# 7. Complete Consultation
+# 7. COMPLETE CONSULTATION
 # -------------------------------
 @app.route("/complete/<int:entry_id>", methods=["POST"])
 def complete_consultation(entry_id):
@@ -277,7 +297,7 @@ def complete_consultation(entry_id):
 
 
 # -------------------------------
-# Run App
+# RUN APP
 # -------------------------------
 if __name__ == "__main__":
     app.run(debug=True)
