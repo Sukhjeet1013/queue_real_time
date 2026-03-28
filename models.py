@@ -24,6 +24,11 @@ class Patient(db.Model):
 class QueueEntry(db.Model):
     __tablename__ = "queue_entries"
 
+    # ✅ UNIQUE constraint added here
+    __table_args__ = (
+        db.UniqueConstraint('clinic_id', 'token_number', name='unique_token_per_clinic'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
     clinic_id = db.Column(db.Integer, db.ForeignKey("clinics.id"), nullable=False)
     patient_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False)

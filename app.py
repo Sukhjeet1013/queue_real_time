@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 from config import Config
 from models import db, Clinic, Patient, QueueEntry
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
 app = Flask(__name__)
@@ -47,7 +48,7 @@ def clinics_list():
 
 
 # -------------------------------
-# 🔥 ADD CLINIC (NEW)
+# 🔥 ADD CLINIC
 # -------------------------------
 @app.route("/add_clinic", methods=["GET", "POST"])
 def add_clinic():
@@ -77,7 +78,7 @@ def clinic_page(clinic_id):
 
 
 # -------------------------------
-# 2. JOIN QUEUE
+# 2. JOIN QUEUE (FIXED)
 # -------------------------------
 @app.route("/join_queue", methods=["POST"])
 def join_queue():
@@ -89,23 +90,30 @@ def join_queue():
     db.session.add(patient)
     db.session.flush()
 
-    last_token = (
-        db.session.query(func.max(QueueEntry.token_number))
-        .filter_by(clinic_id=clinic_id)
-        .scalar()
-    )
+    while True:
+        try:
+            last_token = (
+                db.session.query(func.max(QueueEntry.token_number))
+                .filter_by(clinic_id=clinic_id)
+                .scalar()
+            )
 
-    next_token = 1 if last_token is None else last_token + 1
+            next_token = 1 if last_token is None else last_token + 1
 
-    entry = QueueEntry(
-        clinic_id=clinic_id,
-        patient_id=patient.id,
-        token_number=next_token,
-        status="waiting"
-    )
+            entry = QueueEntry(
+                clinic_id=clinic_id,
+                patient_id=patient.id,
+                token_number=next_token,
+                status="waiting"
+            )
 
-    db.session.add(entry)
-    db.session.commit()
+            db.session.add(entry)
+            db.session.commit()
+
+            break
+
+        except IntegrityError:
+            db.session.rollback()
 
     return redirect(url_for("queue_status", entry_id=entry.id))
 
@@ -158,15 +166,11 @@ def queue_status(entry_id):
     avg_time = None
     if completed:
         total_time = 0
-        count = 0
-
         for e in completed:
             duration = (e.served_at - e.joined_at).total_seconds() / 60
             total_time += duration
-            count += 1
 
-        if count > 0:
-            avg_time = total_time / count
+        avg_time = total_time / len(completed)
 
     estimated_wait = None
 
@@ -175,11 +179,9 @@ def queue_status(entry_id):
 
         if current and current.joined_at:
             elapsed = (datetime.utcnow() - current.joined_at).total_seconds() / 60
-            remaining = max(avg_time - elapsed, 0)
-            wait += remaining
+            wait += max(avg_time - elapsed, 0)
 
         wait += patients_ahead * avg_time
-
         estimated_wait = round(wait, 2)
 
     return render_template(
