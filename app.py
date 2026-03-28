@@ -27,7 +27,22 @@ def init_db():
 
 
 # -------------------------------
-# ✅ 0. HOME ROUTE (FIX)
+# ✅ TEMP ROUTE (USE ONCE)
+# -------------------------------
+@app.route("/init-db")
+def init_db_route():
+    db.create_all()
+
+    if not Clinic.query.first():
+        clinic = Clinic(clinic_name="City Clinic", doctor_name="Dr. Sharma")
+        db.session.add(clinic)
+        db.session.commit()
+
+    return "Database initialized!"
+
+
+# -------------------------------
+# ✅ HOME ROUTE
 # -------------------------------
 @app.route("/")
 def home():
