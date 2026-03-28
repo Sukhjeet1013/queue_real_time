@@ -733,6 +733,7 @@ def register_cli(app):
 
 def register_routes(app):
     @app.route("/")
+    @app.route("/home")
     def home():
         if current_user.is_authenticated and current_user.role in {
             User.ROLE_SUPERADMIN,
@@ -1169,6 +1170,7 @@ def register_error_handlers(app):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.url_map.strict_slashes = False
 
     db.init_app(app)
     login_manager.init_app(app)
