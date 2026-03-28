@@ -753,7 +753,7 @@ def register_routes(app):
             )
 
     @app.route("/clinics")
-    def clinics_list():
+    def clinics():
         try:
             return render_template("clinics.html", **build_clinics_context())
         except SQLAlchemyError:
@@ -785,7 +785,7 @@ def register_routes(app):
         except SQLAlchemyError:
             log_database_exception("Failed to load clinic during queue join.")
             flash("The queue service is temporarily unavailable. Please try again.", "danger")
-            return redirect(url_for("clinics_list"))
+            return redirect(url_for("clinics"))
 
         if not clinic:
             abort(404, description="Clinic not found.")
@@ -1156,7 +1156,7 @@ def register_error_handlers(app):
     def service_unavailable(error):
         return (
             render_template(
-                "404.html",
+                "503.html",
                 error_message=getattr(
                     error,
                     "description",

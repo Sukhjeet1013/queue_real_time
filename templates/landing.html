@@ -15,7 +15,7 @@
                         and staff dashboards that match how a front desk really works.
                     </p>
                     <div class="d-flex flex-column flex-sm-row gap-3 mt-4">
-                        <a href="{{ url_for('clinics_list') }}" class="btn btn-brand btn-lg">View Clinics</a>
+                        <a href="{{ url_for('clinics') }}" class="btn btn-brand btn-lg">View Clinics</a>
                         {% if not current_user.is_authenticated %}
                             <a href="{{ url_for('login') }}" class="btn btn-outline-light btn-lg">Staff Login</a>
                         {% endif %}
