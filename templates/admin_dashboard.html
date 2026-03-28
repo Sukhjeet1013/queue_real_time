@@ -223,7 +223,7 @@
                                         <span class="chip chip-served">Served</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ entry.joined_at.strftime('%d %b %Y, %I:%M %p') }}</td>
+                                <td>{{ entry.joined_at|format_ist }}</td>
                                 <td class="text-end">
                                     <form method="POST" action="{{ url_for('mark_served', entry_id=entry.id) }}" data-loading-form>
                                         <button

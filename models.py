@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
@@ -8,6 +8,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
+IST = timezone(timedelta(hours=5, minutes=30), name="Asia/Kolkata")
+
+
+def ist_now():
+    return datetime.now(IST)
+
 
 class Clinic(db.Model):
     __tablename__ = "clinics"
@@ -15,6 +21,7 @@ class Clinic(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     clinic_name = db.Column(db.String(100), nullable=False)
     doctor_name = db.Column(db.String(100), nullable=False)
+    average_consultation_minutes = db.Column(db.Integer, nullable=True)
 
     users = db.relationship("User", backref="clinic", lazy=True)
     queue_entries = db.relationship("QueueEntry", backref="clinic", lazy=True)
@@ -64,7 +71,7 @@ class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime(timezone=True), default=ist_now, nullable=False)
 
     queue_entries = db.relationship("QueueEntry", backref="patient", lazy=True)
 
@@ -83,13 +90,10 @@ class QueueEntry(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint("clinic_id", "token_number", name="unique_token_per_clinic"),
-
         CheckConstraint(
             "status IN ('waiting', 'in_consultation', 'served')",
             name="check_queue_entry_status",
         ),
-
-        # ✅ SAFE INDEX (no change needed, just kept clean)
         Index(
             "unique_active_queue_entry_per_clinic",
             "clinic_id",
@@ -103,14 +107,10 @@ class QueueEntry(db.Model):
     clinic_id = db.Column(db.Integer, db.ForeignKey("clinics.id"), nullable=False)
     patient_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False)
     token_number = db.Column(db.Integer, nullable=False)
-
     status = db.Column(db.String(20), nullable=False, default=STATUS_WAITING)
-
-    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # ✅ IMPORTANT (already correct, but critical for wait-time logic)
-    consultation_started_at = db.Column(db.DateTime, nullable=True)
-    served_at = db.Column(db.DateTime, nullable=True)
+    joined_at = db.Column(db.DateTime(timezone=True), default=ist_now, nullable=False)
+    consultation_started_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    served_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     @validates("status")
     def validate_status(self, key, value):
