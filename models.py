@@ -83,10 +83,13 @@ class QueueEntry(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint("clinic_id", "token_number", name="unique_token_per_clinic"),
+
         CheckConstraint(
             "status IN ('waiting', 'in_consultation', 'served')",
             name="check_queue_entry_status",
         ),
+
+        # ✅ SAFE INDEX (no change needed, just kept clean)
         Index(
             "unique_active_queue_entry_per_clinic",
             "clinic_id",
@@ -100,8 +103,12 @@ class QueueEntry(db.Model):
     clinic_id = db.Column(db.Integer, db.ForeignKey("clinics.id"), nullable=False)
     patient_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False)
     token_number = db.Column(db.Integer, nullable=False)
+
     status = db.Column(db.String(20), nullable=False, default=STATUS_WAITING)
+
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # ✅ IMPORTANT (already correct, but critical for wait-time logic)
     consultation_started_at = db.Column(db.DateTime, nullable=True)
     served_at = db.Column(db.DateTime, nullable=True)
 
