@@ -224,10 +224,8 @@ def not_found(e):
 # DB INIT
 # ======================
 
-@app.before_first_request
-def setup():
+with app.app_context():
     db.create_all()
-
 
 # ======================
 # RUN
