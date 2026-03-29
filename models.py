@@ -8,11 +8,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 db = SQLAlchemy()
 
+# Keep IST if you want it later for conversion/display (optional)
 IST = timezone(timedelta(hours=5, minutes=30), name="Asia/Kolkata")
 
 
-def ist_now():
-    return datetime.now(IST)
+# 🔥 FIX: Use UTC instead of IST
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class Clinic(db.Model):
@@ -71,7 +73,9 @@ class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20), nullable=False)
-    created_at = db.Column(db.DateTime(timezone=True), default=ist_now, nullable=False)
+
+    # 🔥 FIXED
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now, nullable=False)
 
     queue_entries = db.relationship("QueueEntry", backref="patient", lazy=True)
 
@@ -108,7 +112,10 @@ class QueueEntry(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey("patients.id"), nullable=False)
     token_number = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), nullable=False, default=STATUS_WAITING)
-    joined_at = db.Column(db.DateTime(timezone=True), default=ist_now, nullable=False)
+
+    # 🔥 FIXED
+    joined_at = db.Column(db.DateTime(timezone=True), default=utc_now, nullable=False)
+
     consultation_started_at = db.Column(db.DateTime(timezone=True), nullable=True)
     served_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
