@@ -1,16 +1,11 @@
 import logging
 import os
-import traceback
-from collections import defaultdict
-from datetime import timedelta, datetime
-from functools import wraps
-from urllib.parse import urlsplit
+from datetime import datetime, timedelta
 
-from flask import Flask, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
-from sqlalchemy import case, func, inspect, select, text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import joinedload
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 
 from config import Config
 from models import Clinic, IST, Patient, QueueEntry, User, db
@@ -18,11 +13,21 @@ from models import Clinic, IST, Patient, QueueEntry, User, db
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-login_manager = LoginManager()
+app = Flask(__name__)
+app.config.from_object(Config)
+
+db.init_app(app)
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
 
 
-def utc_now():
-    return datetime.utcnow()
+# ======================
+# UTILS
+# ======================
+
+def ist_now():
+    return datetime.now(IST)
 
 
 def to_ist(value):
@@ -33,229 +38,200 @@ def to_ist(value):
     return value.astimezone(IST)
 
 
-def duration_minutes(start_at, end_at):
-    if not start_at or not end_at:
-        return None
-
-    total_seconds = (to_ist(end_at) - to_ist(start_at)).total_seconds()
-    if total_seconds <= 0:
-        return None
-
-    return max(1, round(total_seconds / 60))
-
-
-def clamp_consultation_duration(minutes):
-    if minutes is None or minutes <= 0:
-        return None
-    if minutes > Config.MAX_CONSULTATION_TIME:
-        return None
-    return max(Config.MIN_CONSULTATION_TIME, minutes)
-
-
-def weighted_average(values):
-    if not values:
-        return None
-
-    weighted_total = 0
-    weight_sum = 0
-    total_values = len(values)
-
-    for index, value in enumerate(values):
-        weight = total_values - index
-        weighted_total += value * weight
-        weight_sum += weight
-
-    return round(weighted_total / weight_sum) if weight_sum else None
-
-
-def normalize_phone(raw_phone):
-    digits = "".join(char for char in (raw_phone or "") if char.isdigit())
-    if len(digits) == 11 and digits.startswith("0"):
-        digits = digits[1:]
-    if len(digits) == 12 and digits.startswith("91"):
-        digits = digits[2:]
-    return digits
-
-
-def is_safe_redirect_target(target):
-    if not target:
-        return False
-
-    current_parts = urlsplit(request.host_url)
-    target_parts = urlsplit(target)
-    return (not target_parts.netloc or target_parts.netloc == current_parts.netloc) and (
-        target_parts.scheme in ("", "http", "https")
-    )
-
-
-def redirect_after_login(default_endpoint="home"):
-    next_url = request.args.get("next") or request.form.get("next")
-    if next_url and is_safe_redirect_target(next_url):
-        return redirect(next_url)
-
-    if current_user.is_authenticated and current_user.role in {
-        User.ROLE_SUPERADMIN,
-        User.ROLE_CLINIC_ADMIN,
-    }:
-        return redirect(url_for("admin_dashboard"))
-
-    return redirect(url_for(default_endpoint))
-
-
-def log_database_exception(message):
-    db.session.rollback()
-    logger.exception(message)
-
+# ======================
+# LOGIN
+# ======================
 
 @login_manager.user_loader
 def load_user(user_id):
-    try:
-        return db.session.get(User, int(user_id))
-    except (TypeError, ValueError):
-        return None
+    return db.session.get(User, int(user_id))
 
 
 @login_manager.unauthorized_handler
-def unauthorized_handler():
-    flash("Please sign in to continue.", "warning")
-    next_url = request.full_path if request.query_string else request.path
-    return redirect(url_for("login", next=next_url))
+def unauthorized():
+    return redirect(url_for("login"))
 
 
-def verify_password(user, raw_password):
-    if not user or not raw_password:
-        return False
+# ======================
+# ROUTES
+# ======================
 
-    password_valid = user.check_password(raw_password)
-    if password_valid and not user.password_uses_hash():
-        user.set_password(raw_password)
+@app.route("/")
+def home():
+    clinics = Clinic.query.all()
+    return render_template("landing.html", clinics=clinics)
+
+
+@app.route("/clinics")
+def clinics():
+    clinics = Clinic.query.all()
+    return render_template("clinics.html", clinics=clinics)
+
+
+@app.route("/clinic/<int:clinic_id>")
+def clinic_detail(clinic_id):
+    clinic = Clinic.query.get_or_404(clinic_id)
+
+    queue = (
+        QueueEntry.query
+        .filter_by(clinic_id=clinic_id)
+        .order_by(QueueEntry.token_number)
+        .all()
+    )
+
+    return render_template("clinic.html", clinic=clinic, queue=queue)
+
+
+@app.route("/join_queue/<int:clinic_id>", methods=["POST"])
+def join_queue(clinic_id):
+    name = request.form.get("name")
+    phone = request.form.get("phone")
+
+    if not name or not phone:
+        flash("Name and phone required", "danger")
+        return redirect(url_for("clinic_detail", clinic_id=clinic_id))
+
+    try:
+        last_token = db.session.query(func.max(QueueEntry.token_number)).filter_by(clinic_id=clinic_id).scalar()
+        next_token = (last_token or 0) + 1
+
+        patient = Patient(name=name, phone=phone)
+        db.session.add(patient)
+        db.session.flush()
+
+        entry = QueueEntry(
+            clinic_id=clinic_id,
+            patient_id=patient.id,
+            token_number=next_token,
+            status=QueueEntry.STATUS_WAITING,
+            joined_at=ist_now()
+        )
+
+        db.session.add(entry)
         db.session.commit()
 
-    return password_valid
+        flash(f"Joined queue. Your token: {next_token}", "success")
+
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash("Something went wrong", "danger")
+
+    return redirect(url_for("clinic_detail", clinic_id=clinic_id))
 
 
-def superadmin_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapped(*args, **kwargs):
-        if current_user.role != User.ROLE_SUPERADMIN:
-            abort(403, description="Only superadmins can access this page.")
-        return view_func(*args, **kwargs)
+# ======================
+# ADMIN
+# ======================
 
-    return wrapped
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
 
+        user = User.query.filter_by(username=username).first()
 
-def clinic_admin_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapped(*args, **kwargs):
-        if current_user.role != User.ROLE_CLINIC_ADMIN:
-            abort(403, description="Only clinic admins can access this page.")
-        if not current_user.clinic_id:
-            abort(403, description="Your account is not assigned to a clinic.")
-        return view_func(*args, **kwargs)
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for("admin_dashboard"))
 
-    return wrapped
+        flash("Invalid credentials", "danger")
+
+    return render_template("login.html")
 
 
-def admin_required(view_func):
-    @wraps(view_func)
-    @login_required
-    def wrapped(*args, **kwargs):
-        if current_user.role not in {User.ROLE_SUPERADMIN, User.ROLE_CLINIC_ADMIN}:
-            abort(403, description="You do not have access to the admin area.")
-        return view_func(*args, **kwargs)
-
-    return wrapped
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("home"))
 
 
-def seed_default_clinics():
-    if db.session.scalar(select(func.count(Clinic.id))) or 0:
-        return
+@app.route("/admin")
+@login_required
+def admin_dashboard():
+    if current_user.role not in [User.ROLE_SUPERADMIN, User.ROLE_CLINIC_ADMIN]:
+        abort(403)
 
-    db.session.add_all(
-        [
-            Clinic(clinic_name="Downtown Medical Centre", doctor_name="Dr. Anika Sharma"),
-            Clinic(clinic_name="Northside Family Clinic", doctor_name="Dr. Raj Malhotra"),
-            Clinic(clinic_name="Lakeside Health Hub", doctor_name="Dr. Priya Mehta"),
-        ]
+    clinic_id = current_user.clinic_id
+
+    queue = (
+        QueueEntry.query
+        .filter_by(clinic_id=clinic_id)
+        .order_by(QueueEntry.token_number)
+        .all()
     )
+
+    return render_template("admin_dashboard.html", queue=queue)
+
+
+@app.route("/call_next", methods=["POST"])
+@login_required
+def call_next():
+    clinic_id = current_user.clinic_id
+
+    current = QueueEntry.query.filter_by(
+        clinic_id=clinic_id,
+        status=QueueEntry.STATUS_IN_CONSULTATION
+    ).first()
+
+    if current:
+        current.status = QueueEntry.STATUS_SERVED
+        current.served_at = ist_now()
+
+    next_entry = QueueEntry.query.filter_by(
+        clinic_id=clinic_id,
+        status=QueueEntry.STATUS_WAITING
+    ).order_by(QueueEntry.token_number).first()
+
+    if next_entry:
+        next_entry.status = QueueEntry.STATUS_IN_CONSULTATION
+        next_entry.consultation_started_at = ist_now()
+
     db.session.commit()
 
-
-def seed_initial_superadmin():
-    username = (os.getenv("DEFAULT_SUPERADMIN_USERNAME") or "").strip()
-    password = os.getenv("DEFAULT_SUPERADMIN_PASSWORD") or ""
-
-    if not username or not password:
-        return
-
-    existing_superadmin = db.session.scalar(
-        select(User).where(User.role == User.ROLE_SUPERADMIN).limit(1)
-    )
-    if existing_superadmin:
-        return
-
-    username_taken = db.session.scalar(
-        select(User).where(func.lower(User.username) == username.lower()).limit(1)
-    )
-    if username_taken:
-        return
-
-    user = User(username=username, role=User.ROLE_SUPERADMIN)
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
+    return redirect(url_for("admin_dashboard"))
 
 
-def repair_queue_state():
-    clinic_ids = db.session.execute(select(Clinic.id)).scalars().all()
+@app.route("/mark_served/<int:entry_id>", methods=["POST"])
+@login_required
+def mark_served(entry_id):
+    entry = QueueEntry.query.get_or_404(entry_id)
 
-    for clinic_id in clinic_ids:
-        active_entries = (
-            db.session.execute(
-                select(QueueEntry)
-                .where(
-                    QueueEntry.clinic_id == clinic_id,
-                    QueueEntry.status == QueueEntry.STATUS_IN_CONSULTATION,
-                )
-                .order_by(QueueEntry.token_number.asc())
-            )
-            .scalars()
-            .all()
-        )
-
-        for stale_entry in active_entries[1:]:
-            stale_entry.status = QueueEntry.STATUS_WAITING
-            stale_entry.consultation_started_at = None
-
-        served_entries = (
-            db.session.execute(
-                select(QueueEntry).where(
-                    QueueEntry.clinic_id == clinic_id,
-                    QueueEntry.status == QueueEntry.STATUS_SERVED,
-                )
-            )
-            .scalars()
-            .all()
-        )
-
-        for entry in served_entries:
-            if entry.served_at is None:
-                entry.served_at = (
-                    to_ist(entry.consultation_started_at)
-                    or to_ist(entry.joined_at)
-                    or to_ist(utc_now())
-                )
-
-            if entry.consultation_started_at is None:
-                joined_at = to_ist(entry.joined_at)
-                served_at = to_ist(entry.served_at)
-                fallback_start = served_at - timedelta(
-                    minutes=Config.DEFAULT_CONSULTATION_TIME
-                )
-                entry.consultation_started_at = (
-                    joined_at if joined_at and joined_at < served_at else fallback_start
-                )
+    entry.status = QueueEntry.STATUS_SERVED
+    entry.served_at = ist_now()
 
     db.session.commit()
+
+    return redirect(url_for("admin_dashboard"))
+
+
+# ======================
+# ERRORS
+# ======================
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template("403.html", error_message=str(e)), 403
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template("404.html"), 404
+
+
+# ======================
+# DB INIT
+# ======================
+
+@app.before_first_request
+def setup():
+    db.create_all()
+
+
+# ======================
+# RUN
+# ======================
+
+if __name__ == "__main__":
+    app.run(debug=True)
