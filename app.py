@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timedelta
+from functools import wraps
 
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 from flask_login import LoginManager, current_user, login_required, login_user, logout_user
@@ -50,6 +51,20 @@ def load_user(user_id):
 @login_manager.unauthorized_handler
 def unauthorized():
     return redirect(url_for("login"))
+
+
+def admin_required(view_func):
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        if not current_user.is_authenticated:
+            abort(401)
+
+        if current_user.role not in [User.ROLE_SUPERADMIN, User.ROLE_CLINIC_ADMIN]:
+            abort(403)
+
+        return view_func(*args, **kwargs)
+
+    return wrapped
 
 
 # ======================
@@ -140,7 +155,7 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["GET", "POST"])
 @login_required
 def logout():
     logout_user()
@@ -149,6 +164,7 @@ def logout():
 
 @app.route("/admin")
 @login_required
+@admin_required
 def admin_dashboard():
     if current_user.role not in [User.ROLE_SUPERADMIN, User.ROLE_CLINIC_ADMIN]:
         abort(403)
@@ -167,6 +183,7 @@ def admin_dashboard():
 
 @app.route("/call_next", methods=["POST"])
 @login_required
+@admin_required
 def call_next():
     clinic_id = current_user.clinic_id
 
@@ -195,6 +212,7 @@ def call_next():
 
 @app.route("/mark_served/<int:entry_id>", methods=["POST"])
 @login_required
+@admin_required
 def mark_served(entry_id):
     entry = QueueEntry.query.get_or_404(entry_id)
 
