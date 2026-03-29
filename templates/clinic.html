@@ -48,7 +48,7 @@
                     </p>
                 </div>
 
-                <form method="POST" action="{{ url_for('join_queue') }}" data-loading-form>
+                <form method="POST" action="{{ url_for('join_queue', clinic_id=clinic.id) }}" data-loading-form>
                     <input type="hidden" name="clinic_id" value="{{ clinic.id }}">
 
                     <div class="mb-3">

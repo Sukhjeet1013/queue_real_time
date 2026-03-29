@@ -22,7 +22,7 @@
                     <p class="section-muted mb-4">Consulting doctor: {{ clinic.doctor_name }}</p>
 
                     <div class="mt-auto d-grid">
-                        <a href="{{ url_for('clinic_page', clinic_id=clinic.id) }}" class="btn btn-brand">
+                        <a href="{{ url_for('clinic_detail', clinic_id=clinic.id) }}" class="btn btn-brand">
                             Join Queue
                         </a>
                     </div>

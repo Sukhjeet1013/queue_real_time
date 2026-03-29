@@ -90,7 +90,7 @@
                                 <td>{{ row.waiting_count }}</td>
                                 <td>{{ row.total_entries }}</td>
                                 <td class="text-end">
-                                    <a href="{{ url_for('clinic_page', clinic_id=row.clinic.id) }}" class="btn btn-outline-brand btn-sm">
+                                    <a href="{{ url_for('clinic_detail', clinic_id=row.clinic.id) }}" class="btn btn-outline-brand btn-sm">
                                         View Public Page
                                     </a>
                                 </td>
